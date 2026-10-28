@@ -7,27 +7,24 @@
 <title>REASSEMBLY</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* { margin: 0; padding: 0; }
 html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
   background: #080808;
 }
-canvas {
-  display: block;
-  touch-action: manipulation;
-}
+canvas { display: block; }
 </style>
 </head>
 <body>
 <script>
 let dj, miles;
-let djLayer, milesLayer;
-let pieces = [];
+let pgA, pgB;
 let t = 0;
+let flow = 0;
 
-const CELL = 24;
+const SCALE = 0.45;
 
 function preload() {
   dj = loadImage("dj.png");
@@ -38,124 +35,90 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   pixelDensity(1);
   frameRate(30);
-  imageMode(CORNER);
-
-  buildLayers();
-  buildPieces();
+  makeBuffers();
 }
 
-// Keep the original image proportions.
-function fitImage(img) {
-  let g = createGraphics(width, height);
-  g.pixelDensity(1);
-  g.background(8);
+function makeBuffers() {
+  if (pgA) pgA.remove();
+  if (pgB) pgB.remove();
 
-  let s = min(width / img.width, height / img.height);
+  let w = max(1, floor(width * SCALE));
+  let h = max(1, floor(height * SCALE));
+
+  pgA = createGraphics(w, h);
+  pgB = createGraphics(w, h);
+  pgA.pixelDensity(1);
+  pgB.pixelDensity(1);
+
+  fitImage(pgA, dj);
+  fitImage(pgB, miles);
+}
+
+function fitImage(pg, img) {
+  pg.background(8);
+
+  let s = min(pg.width / img.width, pg.height / img.height);
   let w = img.width * s;
   let h = img.height * s;
 
-  g.image(img, (width - w) / 2, (height - h) / 2, w, h);
-  return g;
-}
-
-function buildLayers() {
-  if (djLayer) djLayer.remove();
-  if (milesLayer) milesLayer.remove();
-
-  djLayer = fitImage(dj);
-  milesLayer = fitImage(miles);
-}
-
-// Build a field of moving image fragments.
-function buildPieces() {
-  pieces = [];
-
-  let cols = ceil(width / CELL);
-  let rows = ceil(height / CELL);
-
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      pieces.push({
-        x: x * CELL,
-        y: y * CELL,
-        nx: (x + 0.5) / cols,
-        ny: (y + 0.5) / rows,
-        seed: random(1000),
-        size: CELL * random(0.8, 1.5),
-        angle: random(-0.2, 0.2)
-      });
-    }
-  }
+  pg.image(img, (pg.width - w) / 2, (pg.height - h) / 2, w, h);
 }
 
 function draw() {
+  t += 0.002;
+  flow += 0.0015;
+
   background(8);
-  t += 0.004;
 
-  for (let p of pieces) {
-    // Organic flow field
-    let n1 = noise(p.nx * 2.1 + 10, p.ny * 2.1, t);
-    let n2 = noise(p.nx * 2.1, p.ny * 2.1 + 30, t + 5);
+  // Slow, continuous blending.
+  let mix = 0.5 + 0.5 * sin(t * 0.35);
 
-    let wave =
-      sin(p.nx * 8 + t * 1.2 + p.seed * 0.01) *
-      cos(p.ny * 7 - t);
+  // A few large, soft-moving image layers.
+  // No per-pixel or per-tile drawing loops.
+  let dx = (noise(flow, 10) - 0.5) * width * 0.035;
+  let dy = (noise(20, flow) - 0.5) * height * 0.035;
+  let angle = (noise(flow * 0.5, 30) - 0.5) * 0.035;
 
-    let movement = 15 + noise(p.seed * 0.01, t * 0.2) * 100;
+  push();
+  translate(width / 2 + dx, height / 2 + dy);
+  rotate(angle);
 
-    let x = p.x + (n1 - 0.5) * movement * 2 + wave * 12;
-    let y = p.y + (n2 - 0.5) * movement * 2;
+  imageMode(CENTER);
 
-    // Smoothly blend between the two portraits.
-    let blend = noise(
-      p.nx * 2.5 + p.seed * 0.002,
-      p.ny * 2.5,
-      t * 0.3
-    );
+  tint(255, 255 * (1 - mix));
+  image(pgA, 0, 0, width * 1.06, height * 1.06);
 
-    let size = p.size * (1 + 0.18 * sin(t + p.seed));
-    let sx = p.nx * width;
-    let sy = p.ny * height;
+  tint(255, 255 * mix);
+  image(
+    pgB,
+    -dx * 0.7,
+    dy * 0.5,
+    width * 1.06,
+    height * 1.06
+  );
 
-    push();
-    translate(x + CELL / 2, y + CELL / 2);
-    rotate(p.angle + wave * 0.15);
+  pop();
+  imageMode(CORNER);
+  noTint();
 
-    tint(255, 255 * (1 - blend));
-    image(
-      djLayer,
-      -size / 2, -size / 2, size, size,
-      sx, sy, CELL, CELL
-    );
-
-    tint(255, 255 * blend);
-    image(
-      milesLayer,
-      -size / 2, -size / 2, size, size,
-      sx, sy, CELL, CELL
-    );
-
-    pop();
-  }
+  // A second, very subtle flowing layer.
+  let layerMix = 0.5 + 0.5 * sin(t * 0.19 + 1.5);
+  push();
+  translate(
+    width / 2 - dx * 1.5,
+    height / 2 - dy * 1.5
+  );
+  rotate(-angle * 1.4);
+  tint(255, 22 * layerMix);
+  image(pgA, 0, 0, width * 1.1, height * 1.1);
+  pop();
 
   noTint();
 }
 
-// A gentle, continuous change in the flow when touched.
-function mousePressed() {
-  t += 1.5;
-  return false;
-}
-
-function touchStarted() {
-  t += 1.5;
-  return false;
-}
-
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  buildLayers();
-  buildPieces();
+  makeBuffers();
 }
 </script>
 </body>
