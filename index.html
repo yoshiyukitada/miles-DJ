@@ -2,223 +2,191 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>REASSEMBLY — ORGANIC MUTATION</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;overflow:hidden;background:#080808}
-canvas{display:block}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>REASSEMBLY — Miles × Mona Lisa</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #080808;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #caption {
+      position: fixed;
+      bottom: 22px;
+      left: 0;
+      width: 100%;
+      color: rgba(255,255,255,0.65);
+      text-align: center;
+      font: 11px Arial, sans-serif;
+      letter-spacing: 3px;
+      pointer-events: none;
+    }
+  </style>
 </head>
+
 <body>
-<script>
-let dj, miles;
-let layer;
-let pieces = [];
-let words = [];
-let started = false;
-let t = 0;
+  <div id="caption">REASSEMBLY — MILES × MONA LISA</div>
 
-const CELL = 22;
-const WORDS = [
-  "REASSEMBLY", "MILES", "MONA LISA",
-  "COLLISION", "MUTATION", "JAZZ",
-  "FRAGMENT", "MEMORY", "NOISE"
-];
+  <script>
+    let djImage;
+    let milesImage;
+    let currentImage;
+    let pieces = [];
 
-function preload() {
-  dj = loadImage("dj.png");
-  miles = loadImage("miles.png");
-}
+    const TILE_SIZE = 24;
+    const CYCLE_DURATION = 6000;
 
-function setup() {
-  createCanvas(windowWidth, windowHeight);
-  pixelDensity(1);
-  layer = createGraphics(windowWidth, windowHeight);
-  layer.pixelDensity(1);
-  textFont("Arial");
-  buildArtwork();
-}
+    let currentIndex = -1;
+    let cycleStart = 0;
+    let scaleFactor = 1;
+    let offsetX = 0;
+    let offsetY = 0;
 
-function buildArtwork() {
-  pieces = [];
-  words = [];
-
-  let cols = ceil(width / CELL);
-  let rows = ceil(height / CELL);
-
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      pieces.push({
-        x: x * CELL,
-        y: y * CELL,
-        nx: (x + 0.5) / cols,
-        ny: (y + 0.5) / rows,
-        seed: random(1000),
-        size: CELL + random(-3, 5),
-        imageChoice: random()
-      });
-    }
-  }
-
-  for (let i = 0; i < 28; i++) {
-    words.push({
-      value: random(WORDS),
-      x: random(width),
-      y: random(height),
-      size: random(11, 46),
-      seed: random(1000),
-      speed: random(0.2, 1.1),
-      red: random() < 0.25,
-      angle: random(-0.5, 0.5)
-    });
-  }
-}
-
-function draw() {
-  background(8, 8, 8, 255);
-  t += 0.007;
-
-  // The blend never follows a fixed start/end cycle.
-  // It flows continuously between both source images.
-  let blend = 0.5 + 0.5 * sin(t * 0.31 + sin(t * 0.13));
-
-  for (let p of pieces) {
-    let flowX = noise(p.nx * 2.1 + 12, p.ny * 2.0, t) - 0.5;
-    let flowY = noise(p.nx * 2.0, p.ny * 2.1 + 40, t + 20) - 0.5;
-
-    let wave = sin(p.nx * 12 + t * 1.3 + p.seed) *
-               cos(p.ny * 10 - t * 0.8);
-
-    let amp = 18 + 52 * (0.5 + 0.5 * sin(t * 0.2 + p.seed));
-    let px = p.x + flowX * amp + wave * 12;
-    let py = p.y + flowY * amp + cos(t + p.seed) * 9;
-
-    // Organic switching between source-image fragments.
-    let localBlend = 0.5 + 0.5 * sin(
-      t * 0.28 + p.nx * 5 + p.ny * 4 + p.seed * 0.025
-    );
-
-    let img = localBlend > 0.5 ? miles : dj;
-    let imgW = img.width;
-    let imgH = img.height;
-
-    let sx = p.nx * imgW;
-    let sy = p.ny * imgH;
-    let sw = max(1, CELL / width * imgW);
-    let sh = max(1, CELL / height * imgH);
-
-    push();
-    translate(px + CELL / 2, py + CELL / 2);
-    rotate(wave * 0.12);
-
-    // Draw fragments from the original images.
-    tint(255, 215);
-    image(
-      img,
-      -p.size / 2, -p.size / 2, p.size, p.size,
-      sx, sy, sw, sh
-    );
-
-    // Fine seams make the fragmented collage visible.
-    noFill();
-    stroke(255, 28);
-    strokeWeight(0.5);
-    rect(-p.size / 2, -p.size / 2, p.size, p.size);
-    pop();
-  }
-
-  drawTypography(blend);
-  drawEditorialDetails();
-}
-
-function drawTypography(blend) {
-  for (let w of words) {
-    let nx = noise(w.seed, t * 0.18);
-    let ny = noise(w.seed + 80, t * 0.18);
-
-    let x = (w.x + nx * width * 0.25 +
-      sin(t * w.speed + w.seed) * 24) % width;
-
-    let y = (w.y + ny * height * 0.2 +
-      cos(t * w.speed * 0.7 + w.seed) * 28) % height;
-
-    let size = w.size * (0.8 + 0.3 * sin(t * 0.4 + w.seed));
-
-    push();
-    translate(x, y);
-    rotate(w.angle + sin(t * 0.2 + w.seed) * 0.2);
-
-    textAlign(CENTER, CENTER);
-    textStyle(BOLD);
-    textSize(size);
-
-    if (w.red) {
-      fill(255, 20, 45, 205);
-    } else {
-      fill(255, 190);
+    function preload() {
+      djImage = loadImage("dj.png");
+      milesImage = loadImage("miles.png");
     }
 
-    text(w.value, 0, 0);
-    pop();
-  }
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      noStroke();
 
-  // Oversized fixed editorial title.
-  push();
-  textAlign(LEFT, TOP);
-  textStyle(BOLD);
-  textSize(min(width * 0.105, 48));
-  fill(255);
-  text("REASSEMBLY", 15, 16);
+      cycleStart = millis();
+      setArtwork(0);
+    }
 
-  textSize(9);
-  fill(255, 25, 45);
-  text("ORGANIC MUTATION / 001", 18, 22 + min(width * 0.105, 48));
-  pop();
-}
+    function setArtwork(index) {
+      currentIndex = index;
+      currentImage = index === 0 ? djImage : milesImage;
+      buildPieces();
+    }
 
-function drawEditorialDetails() {
-  noStroke();
-  fill(255, 180);
-  textAlign(RIGHT, BOTTOM);
-  textSize(9);
-  text("MILES × MONA LISA", width - 16, height - 28);
+    function buildPieces() {
+      pieces = [];
 
-  fill(255, 35, 55);
-  text("ENDLESS VISUAL PROCESS", width - 16, height - 14);
+      if (!currentImage) return;
 
-  stroke(255, 100);
-  strokeWeight(1);
-  let m = 12, l = 9;
-  line(m, m, m + l, m);
-  line(m, m, m, m + l);
-  line(width-m, m, width-m-l, m);
-  line(width-m, m, width-m, m+l);
-  line(m, height-m, m+l, height-m);
-  line(m, height-m, m, height-m-l);
-  line(width-m, height-m, width-m-l, height-m);
-  line(width-m, height-m, width-m, height-m-l);
-}
+      scaleFactor = min(
+        width / currentImage.width,
+        height / currentImage.height
+      ) * 0.92;
 
-function mousePressed() {
-  // Change the visual flow without stopping the animation.
-  t += random(1, 4);
-  return false;
-}
+      offsetX = (width - currentImage.width * scaleFactor) / 2;
+      offsetY = (height - currentImage.height * scaleFactor) / 2;
 
-function touchStarted() {
-  t += random(1, 4);
-  return false;
-}
+      for (let y = 0; y < currentImage.height; y += TILE_SIZE) {
+        for (let x = 0; x < currentImage.width; x += TILE_SIZE) {
+          let sw = min(TILE_SIZE, currentImage.width - x);
+          let sh = min(TILE_SIZE, currentImage.height - y);
 
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-  layer = createGraphics(windowWidth, windowHeight);
-  layer.pixelDensity(1);
-  buildArtwork();
-}
-</script>
+          pieces.push({
+            sx: x,
+            sy: y,
+            sw: sw,
+            sh: sh,
+
+            x: offsetX + x * scaleFactor,
+            y: offsetY + y * scaleFactor,
+            w: sw * scaleFactor,
+            h: sh * scaleFactor,
+
+            dx: random(-width * 0.65, width * 0.65),
+            dy: random(-height * 0.65, height * 0.65),
+            angle: random(-0.5, 0.5)
+          });
+        }
+      }
+    }
+
+    function ease(t) {
+      t = constrain(t, 0, 1);
+      return t * t * (3 - 2 * t);
+    }
+
+    function draw() {
+      background(8);
+
+      let elapsed = millis() - cycleStart;
+      let imageIndex = floor(elapsed / CYCLE_DURATION) % 2;
+
+      if (imageIndex !== currentIndex) {
+        setArtwork(imageIndex);
+      }
+
+      let timeInCycle = elapsed % CYCLE_DURATION;
+      let scatter = 0;
+
+      // 最初は元の画像を見せる
+      if (timeInCycle < 1000) {
+        scatter = 0;
+      }
+
+      // 画像が散乱する
+      else if (timeInCycle < 2600) {
+        scatter = ease((timeInCycle - 1000) / 1600);
+      }
+
+      // 断片が元の位置へ戻る
+      else if (timeInCycle < 4200) {
+        scatter = 1 - ease((timeInCycle - 2600) / 1600);
+      }
+
+      // 再構成された画像を見せる
+      else {
+        scatter = 0;
+      }
+
+      for (let p of pieces) {
+        let moveX = p.dx * scatter;
+        let moveY = p.dy * scatter;
+
+        let px = p.x + moveX;
+        let py = p.y + moveY;
+        let rotation = p.angle * scatter;
+
+        push();
+
+        translate(px + p.w / 2, py + p.h / 2);
+        rotate(rotation);
+
+        image(
+          currentImage,
+          -p.w / 2,
+          -p.h / 2,
+          p.w,
+          p.h,
+          p.sx,
+          p.sy,
+          p.sw,
+          p.sh
+        );
+
+        pop();
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      buildPieces();
+    }
+  </script>
 </body>
 </html>
