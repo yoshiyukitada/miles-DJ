@@ -3,14 +3,12 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>REASSEMBLY</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
 <style>
-* { box-sizing: border-box; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
-  margin: 0;
-  padding: 0;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -24,20 +22,16 @@ canvas {
 </head>
 <body>
 <script>
-let dj, miles, fuck;
+let dj, miles;
 let djLayer, milesLayer;
 let pieces = [];
-let words = [];
 let t = 0;
-let pulse = 0;
 
-const CELL = 25;
+const CELL = 24;
 
-// Load the three original images
 function preload() {
   dj = loadImage("dj.png");
   miles = loadImage("miles.png");
-  fuck = loadImage("fuck.png");
 }
 
 function setup() {
@@ -46,12 +40,11 @@ function setup() {
   frameRate(30);
   imageMode(CORNER);
 
-  buildPortraitLayers();
+  buildLayers();
   buildPieces();
-  buildWordObjects();
 }
 
-// Fit portraits to the canvas without distortion
+// Keep the original image proportions.
 function fitImage(img) {
   let g = createGraphics(width, height);
   g.pixelDensity(1);
@@ -65,7 +58,7 @@ function fitImage(img) {
   return g;
 }
 
-function buildPortraitLayers() {
+function buildLayers() {
   if (djLayer) djLayer.remove();
   if (milesLayer) milesLayer.remove();
 
@@ -73,7 +66,7 @@ function buildPortraitLayers() {
   milesLayer = fitImage(miles);
 }
 
-// Portrait fragments
+// Build a field of moving image fragments.
 function buildPieces() {
   pieces = [];
 
@@ -88,83 +81,58 @@ function buildPieces() {
         nx: (x + 0.5) / cols,
         ny: (y + 0.5) / rows,
         seed: random(1000),
-        size: CELL * random(0.8, 1.4),
-        angle: random(-0.15, 0.15)
+        size: CELL * random(0.8, 1.5),
+        angle: random(-0.2, 0.2)
       });
     }
   }
 }
 
-// Floating intact word images
-function buildWordObjects() {
-  words = [];
-
-  for (let i = 0; i < 7; i++) {
-    words.push({
-      x: random(width),
-      y: random(height),
-      seed: random(1000),
-      scale: random(0.15, 0.75),
-      rotation: random(-0.4, 0.4),
-      phase: random(TWO_PI)
-    });
-  }
-}
-
-// Main endless animation
 function draw() {
   background(8);
   t += 0.004;
-  pulse = lerp(pulse, 0, 0.015);
 
-  drawFlowingPortraits();
-  drawOrganicWords();
-  drawWordFragments();
-}
-
-// Continuous movement and blending of the portraits
-function drawFlowingPortraits() {
   for (let p of pieces) {
-    let n1 = noise(p.nx * 2.0 + 10, p.ny * 2.0, t);
-    let n2 = noise(p.nx * 2.0, p.ny * 2.0 + 30, t + 5);
+    // Organic flow field
+    let n1 = noise(p.nx * 2.1 + 10, p.ny * 2.1, t);
+    let n2 = noise(p.nx * 2.1, p.ny * 2.1 + 30, t + 5);
 
     let wave =
-      sin(p.nx * 7 + t * 1.4 + p.seed * 0.01) *
-      cos(p.ny * 8 - t);
+      sin(p.nx * 8 + t * 1.2 + p.seed * 0.01) *
+      cos(p.ny * 7 - t);
 
-    let movement = 20 + noise(p.seed * 0.01, t * 0.2) * 90;
+    let movement = 15 + noise(p.seed * 0.01, t * 0.2) * 100;
 
     let x = p.x + (n1 - 0.5) * movement * 2 + wave * 12;
     let y = p.y + (n2 - 0.5) * movement * 2;
 
+    // Smoothly blend between the two portraits.
     let blend = noise(
-      p.nx * 2.2 + p.seed * 0.002,
-      p.ny * 2.2,
+      p.nx * 2.5 + p.seed * 0.002,
+      p.ny * 2.5,
       t * 0.3
     );
 
-    let size = p.size * (1 + 0.12 * sin(t + p.seed));
+    let size = p.size * (1 + 0.18 * sin(t + p.seed));
     let sx = p.nx * width;
     let sy = p.ny * height;
-    let sw = CELL;
-    let sh = CELL;
 
     push();
     translate(x + CELL / 2, y + CELL / 2);
-    rotate(p.angle + wave * 0.12);
+    rotate(p.angle + wave * 0.15);
 
     tint(255, 255 * (1 - blend));
     image(
       djLayer,
       -size / 2, -size / 2, size, size,
-      sx, sy, sw, sh
+      sx, sy, CELL, CELL
     );
 
     tint(255, 255 * blend);
     image(
       milesLayer,
       -size / 2, -size / 2, size, size,
-      sx, sy, sw, sh
+      sx, sy, CELL, CELL
     );
 
     pop();
@@ -173,96 +141,21 @@ function drawFlowingPortraits() {
   noTint();
 }
 
-// The word image remains intact but changes organically
-function drawOrganicWords() {
-  for (let w of words) {
-    let nx = noise(w.seed, t * 0.15);
-    let ny = noise(w.seed + 70, t * 0.15);
-
-    let x = width * nx;
-    let y = height * ny;
-
-    let breathing = 0.5 + 0.5 * sin(t * 0.65 + w.phase);
-    let size = w.scale * (0.12 + breathing * 0.9);
-
-    // Fade in and out continuously
-    let visibility =
-      pow(0.5 + 0.5 * sin(t * 0.42 + w.phase), 1.8);
-
-    // Occasionally a word grows dramatically
-    let swell = noise(w.seed + 200, t * 0.12);
-    size *= 0.65 + swell * 1.5;
-
-    push();
-    translate(x, y);
-    rotate(w.rotation + (noise(w.seed + 400, t * 0.12) - 0.5) * 0.7);
-    imageMode(CENTER);
-
-    tint(255, 230 * visibility);
-    image(fuck, 0, 0, width * size, height * size);
-
-    pop();
-  }
-
-  imageMode(CORNER);
-  noTint();
-}
-
-// Occasional small fragments of the original word image
-function drawWordFragments() {
-  for (let i = 0; i < 30; i++) {
-    let seed = i * 17.73;
-
-    let visible = noise(seed, t * 0.25);
-    if (visible < 0.48) continue;
-
-    let x = noise(seed + 10, t * 0.18) * width;
-    let y = noise(seed + 40, t * 0.18) * height;
-
-    let sx = noise(seed + 60, t * 0.1) * max(1, fuck.width - 1);
-    let sy = noise(seed + 80, t * 0.1) * max(1, fuck.height - 1);
-
-    let sw = min(fuck.width - sx, random(18, 80));
-    let sh = min(fuck.height - sy, random(12, 50));
-
-    let size = 10 + noise(seed + 100, t * 0.3) * 70;
-    let alpha = 40 + visible * 180;
-
-    push();
-    translate(x, y);
-    rotate((noise(seed + 120, t * 0.15) - 0.5) * 1.4);
-
-    tint(255, alpha);
-    image(
-      fuck,
-      -size / 2, -size / 2, size, size,
-      sx, sy, sw, sh
-    );
-
-    pop();
-  }
-
-  noTint();
-}
-
-// Click or tap to disturb the flow
+// A gentle, continuous change in the flow when touched.
 function mousePressed() {
-  t += random(0.5, 2.5);
-  pulse = 1;
+  t += 1.5;
   return false;
 }
 
 function touchStarted() {
-  t += random(0.5, 2.5);
-  pulse = 1;
+  t += 1.5;
   return false;
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  buildPortraitLayers();
+  buildLayers();
   buildPieces();
-  buildWordObjects();
 }
 </script>
 </body>
