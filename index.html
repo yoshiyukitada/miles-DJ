@@ -1,59 +1,107 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>REASSEMBLY</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
-<style>
-html, body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background: black;
-}
-canvas { display: block; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PORTRAIT — Generative Art</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
 </head>
 <body>
 <script>
-let dj, miles;
-let t = 0;
+let miles;
+let dj;
 
 function preload() {
-  dj = loadImage("dj.png");
   miles = loadImage("miles.png");
+  dj = loadImage("dj.png");
 }
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  pixelDensity(1);
   imageMode(CENTER);
+  miles.filter(GRAY);
+  dj.filter(GRAY);
 }
 
 function draw() {
   background(0);
-  t += 0.008;
 
-  // Smooth, continuous changes
+  let t = frameCount * 0.003;
+
+  // ゆっくり変化する重なり
   let mix = (sin(t) + 1) / 2;
-  let x = sin(t * 0.4) * width * 0.025;
-  let y = cos(t * 0.3) * height * 0.025;
-  let zoom = 1 + sin(t * 0.25) * 0.08;
 
-  let s1 = min(width / dj.width, height / dj.height);
-  let s2 = min(width / miles.width, height / miles.height);
+  // 写真が呼吸するように拡大・縮小
+  let zoom = 1.08 + sin(t * 0.7) * 0.06;
 
-  tint(255, 255);
-  image(dj, width / 2 + x, height / 2 + y,
-        dj.width * s1 * zoom, dj.height * s1 * zoom);
+  // 画面中央から少しずらす
+  let shiftX = sin(t * 0.6) * width * 0.08;
+  let shiftY = cos(t * 0.5) * height * 0.04;
 
-  tint(255, mix * 255);
-  image(miles, width / 2 - x, height / 2 - y,
-        miles.width * s2 * zoom, miles.height * s2 * zoom);
+  // 背後に残る薄い肖像
+  drawPortrait(
+    dj,
+    width * 0.48 - shiftX,
+    height * 0.50 + shiftY,
+    zoom * 1.12,
+    35 + mix * 25,
+    -0.025
+  );
 
-  noTint();
+  // 2枚の肖像がゆっくり入れ替わる
+  drawPortrait(
+    miles,
+    width * 0.52 + shiftX,
+    height * 0.50 - shiftY,
+    zoom,
+    70 + mix * 100,
+    sin(t * 0.4) * 0.025
+  );
+
+  drawPortrait(
+    dj,
+    width * 0.48 - shiftX,
+    height * 0.50 + shiftY,
+    zoom,
+    170 - mix * 100,
+    cos(t * 0.4) * 0.025
+  );
+
+  // 周囲を暗くして視線を中央へ
+  noStroke();
+  for (let i = 0; i < 12; i++) {
+    fill(0, 0, 0, 9);
+    rect(
+      i * width / 24,
+      i * height / 24,
+      width - i * width / 12,
+      height - i * height / 12
+    );
+  }
+}
+
+function drawPortrait(img, x, y, zoom, alpha, angle) {
+  let scaleSize = min(width / img.width, height / img.height);
+  let w = img.width * scaleSize * zoom;
+  let h = img.height * scaleSize * zoom;
+
+  push();
+  translate(x, y);
+  rotate(angle);
+  tint(255, alpha);
+  image(img, 0, 0, w, h);
+  pop();
 }
 
 function windowResized() {
