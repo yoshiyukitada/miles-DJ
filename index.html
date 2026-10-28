@@ -2,191 +2,292 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>REASSEMBLY — Miles × Mona Lisa</title>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
-
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #080808;
-    }
-
-    canvas {
-      display: block;
-    }
-
-    #caption {
-      position: fixed;
-      bottom: 22px;
-      left: 0;
-      width: 100%;
-      color: rgba(255,255,255,0.65);
-      text-align: center;
-      font: 11px Arial, sans-serif;
-      letter-spacing: 3px;
-      pointer-events: none;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>REASSEMBLY — Collision of Two Icons</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#080808}
+canvas{display:block}
+</style>
 </head>
-
 <body>
-  <div id="caption">REASSEMBLY — MILES × MONA LISA</div>
+<script>
+let dj, miles;
+let tiles = [];
+let phaseStart = 0;
+let phase = 0;
+let manualBurst = 0;
 
-  <script>
-    let djImage;
-    let milesImage;
-    let currentImage;
-    let pieces = [];
+const GRID = 25;
+const WORDS = [
+  "REASSEMBLY",
+  "MILES",
+  "MONA LISA",
+  "JAZZ",
+  "COLLISION",
+  "NOISE",
+  "RHYTHM",
+  "FRAGMENT",
+  "ONE LINE",
+  "MILES × MONA"
+];
 
-    const TILE_SIZE = 24;
-    const CYCLE_DURATION = 6000;
+let typeObjects = [];
 
-    let currentIndex = -1;
-    let cycleStart = 0;
-    let scaleFactor = 1;
-    let offsetX = 0;
-    let offsetY = 0;
+function preload() {
+  dj = loadImage("dj.png");
+  miles = loadImage("miles.png");
+}
 
-    function preload() {
-      djImage = loadImage("dj.png");
-      milesImage = loadImage("miles.png");
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  pixelDensity(1);
+  textFont("Arial");
+  buildComposition();
+  phaseStart = millis();
+}
+
+function buildComposition() {
+  tiles = [];
+  typeObjects = [];
+
+  let cell = GRID;
+  let cols = ceil(width / cell);
+  let rows = ceil(height / cell);
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let nx = x / cols;
+      let ny = y / rows;
+
+      tiles.push({
+        x: x * cell,
+        y: y * cell,
+        w: cell + 1,
+        h: cell + 1,
+        nx: nx,
+        ny: ny,
+        seed: random(1000),
+        dx: random(-width * 0.35, width * 0.35),
+        dy: random(-height * 0.35, height * 0.35),
+        rot: random(-0.7, 0.7),
+        source: random() < 0.5 ? 0 : 1
+      });
+    }
+  }
+
+  for (let i = 0; i < 24; i++) {
+    typeObjects.push({
+      word: random(WORDS),
+      x: random(width),
+      y: random(height),
+      size: random(12, 48),
+      angle: random(-0.8, 0.8),
+      speed: random(0.2, 1.1),
+      seed: random(1000),
+      red: random() < 0.22,
+      layer: random()
+    });
+  }
+}
+
+function draw() {
+  background(8, 8, 8, 255);
+
+  let elapsed = (millis() - phaseStart) % 16000;
+  phase = elapsed / 16000;
+
+  // 0–25%: portraits merge
+  // 25–55%: fragments scatter
+  // 55–80%: fragments reconstruct
+  // 80–100%: hold the fused image
+
+  let scatter;
+  if (phase < 0.25) {
+    scatter = 0.12;
+  } else if (phase < 0.55) {
+    scatter = ease((phase - 0.25) / 0.30);
+  } else if (phase < 0.80) {
+    scatter = 1 - ease((phase - 0.55) / 0.25);
+  } else {
+    scatter = 0;
+  }
+
+  scatter = max(scatter, manualBurst * 0.75);
+  manualBurst *= 0.965;
+
+  // A subtle red field behind the composition
+  noStroke();
+  fill(190, 0, 35, 16 + 25 * scatter);
+  rect(0, 0, width, height);
+
+  // Image fragments: each tile samples the original photographs
+  for (let p of tiles) {
+    let pulse = sin(frameCount * 0.018 + p.seed);
+    let moving = scatter;
+
+    let px = p.x + p.dx * moving
+      + sin(frameCount * 0.012 + p.seed) * 5;
+    let py = p.y + p.dy * moving
+      + cos(frameCount * 0.016 + p.seed) * 5;
+
+    let turn = p.rot * moving;
+
+    // Alternating fragments from both original images.
+    // The source shifts gradually to create visual fusion.
+    let blend = constrain(
+      0.5 + 0.5 * sin(frameCount * 0.008 + p.nx * 9 + p.ny * 7),
+      0, 1
+    );
+
+    let chooseMiles = (p.source === 1) ? blend : 1 - blend;
+    let source = chooseMiles > 0.53 ? miles : dj;
+
+    // Fit both images into the same portrait composition.
+    let scaleFit = min(width / source.width, height / source.height) * 0.94;
+    let dw = source.width * scaleFit;
+    let dh = source.height * scaleFit;
+    let ox = (width - dw) / 2;
+    let oy = (height - dh) / 2;
+
+    // Sample corresponding normalized regions of each original.
+    let sx = p.nx * source.width;
+    let sy = p.ny * source.height;
+    let sw = p.w / width * source.width;
+    let sh = p.h / height * source.height;
+
+    push();
+    translate(px + p.w / 2, py + p.h / 2);
+    rotate(turn);
+
+    tint(255, 225);
+    image(
+      source,
+      -p.w / 2, -p.h / 2, p.w, p.h,
+      sx, sy, sw, sh
+    );
+
+    // Fine white seams create a printed collage texture.
+    noFill();
+    stroke(255, 255, 255, 20 + 35 * scatter);
+    strokeWeight(0.4);
+    rect(-p.w / 2, -p.h / 2, p.w, p.h);
+    pop();
+  }
+
+  // Oversized editorial typography
+  drawTypography(scatter);
+
+  // Minimal registration marks
+  drawMarks();
+
+  // Small interaction cue
+  noStroke();
+  fill(255, 175);
+  textAlign(LEFT, BOTTOM);
+  textSize(9);
+  text("TOUCH TO DISRUPT", 18, height - 18);
+}
+
+function drawTypography(scatter) {
+  for (let t of typeObjects) {
+    let drift = sin(frameCount * 0.012 * t.speed + t.seed);
+    let x = t.x + drift * 24 * (0.3 + scatter);
+    let y = t.y + cos(frameCount * 0.009 + t.seed) * 18;
+
+    push();
+    translate(x, y);
+    rotate(t.angle * (0.35 + scatter));
+
+    textAlign(CENTER, CENTER);
+    textStyle(BOLD);
+    textSize(t.size * (1 + scatter * 0.22));
+
+    if (t.red) {
+      fill(255, 20, 45, 210);
+    } else {
+      fill(255, 220);
     }
 
-    function setup() {
-      createCanvas(windowWidth, windowHeight);
-      pixelDensity(1);
-      noStroke();
-
-      cycleStart = millis();
-      setArtwork(0);
+    // Typography behaves like a layer in the collage.
+    if (t.layer < 0.7) {
+      text(t.word, 0, 0);
+    } else {
+      noFill();
+      stroke(t.red ? color(255, 20, 45, 190) : color(255, 150));
+      strokeWeight(0.7);
+      text(t.word, 0, 0);
     }
 
-    function setArtwork(index) {
-      currentIndex = index;
-      currentImage = index === 0 ? djImage : milesImage;
-      buildPieces();
-    }
+    pop();
+  }
 
-    function buildPieces() {
-      pieces = [];
+  // Large cropped title
+  push();
+  textAlign(LEFT, TOP);
+  textStyle(BOLD);
+  textSize(min(width * 0.115, 56));
+  fill(255);
+  text("REASSEMBLY", 16, 18);
 
-      if (!currentImage) return;
+  textSize(10);
+  fill(255, 30, 55);
+  text("THE COLLISION OF TWO ICONS", 19, 24 + min(width * 0.115, 56));
+  pop();
 
-      scaleFactor = min(
-        width / currentImage.width,
-        height / currentImage.height
-      ) * 0.92;
+  // Editorial footer
+  push();
+  textAlign(RIGHT, BOTTOM);
+  textStyle(BOLD);
+  textSize(10);
+  fill(255);
+  text("MILES × MONA LISA", width - 18, height - 38);
+  fill(255, 30, 55);
+  text("IMAGE / SOUND / MEMORY", width - 18, height - 24);
+  pop();
+}
 
-      offsetX = (width - currentImage.width * scaleFactor) / 2;
-      offsetY = (height - currentImage.height * scaleFactor) / 2;
+function drawMarks() {
+  stroke(255, 90);
+  strokeWeight(1);
 
-      for (let y = 0; y < currentImage.height; y += TILE_SIZE) {
-        for (let x = 0; x < currentImage.width; x += TILE_SIZE) {
-          let sw = min(TILE_SIZE, currentImage.width - x);
-          let sh = min(TILE_SIZE, currentImage.height - y);
+  let m = 14;
+  let l = 10;
 
-          pieces.push({
-            sx: x,
-            sy: y,
-            sw: sw,
-            sh: sh,
+  line(m, m, m + l, m);
+  line(m, m, m, m + l);
 
-            x: offsetX + x * scaleFactor,
-            y: offsetY + y * scaleFactor,
-            w: sw * scaleFactor,
-            h: sh * scaleFactor,
+  line(width - m, m, width - m - l, m);
+  line(width - m, m, width - m, m + l);
 
-            dx: random(-width * 0.65, width * 0.65),
-            dy: random(-height * 0.65, height * 0.65),
-            angle: random(-0.5, 0.5)
-          });
-        }
-      }
-    }
+  line(m, height - m, m + l, height - m);
+  line(m, height - m, m, height - m - l);
 
-    function ease(t) {
-      t = constrain(t, 0, 1);
-      return t * t * (3 - 2 * t);
-    }
+  line(width - m, height - m, width - m - l, height - m);
+  line(width - m, height - m, width - m, height - m - l);
+}
 
-    function draw() {
-      background(8);
+function ease(t) {
+  t = constrain(t, 0, 1);
+  return t * t * (3 - 2 * t);
+}
 
-      let elapsed = millis() - cycleStart;
-      let imageIndex = floor(elapsed / CYCLE_DURATION) % 2;
+function mousePressed() {
+  manualBurst = 1;
+  return false;
+}
 
-      if (imageIndex !== currentIndex) {
-        setArtwork(imageIndex);
-      }
+function touchStarted() {
+  manualBurst = 1;
+  return false;
+}
 
-      let timeInCycle = elapsed % CYCLE_DURATION;
-      let scatter = 0;
-
-      // 最初は元の画像を見せる
-      if (timeInCycle < 1000) {
-        scatter = 0;
-      }
-
-      // 画像が散乱する
-      else if (timeInCycle < 2600) {
-        scatter = ease((timeInCycle - 1000) / 1600);
-      }
-
-      // 断片が元の位置へ戻る
-      else if (timeInCycle < 4200) {
-        scatter = 1 - ease((timeInCycle - 2600) / 1600);
-      }
-
-      // 再構成された画像を見せる
-      else {
-        scatter = 0;
-      }
-
-      for (let p of pieces) {
-        let moveX = p.dx * scatter;
-        let moveY = p.dy * scatter;
-
-        let px = p.x + moveX;
-        let py = p.y + moveY;
-        let rotation = p.angle * scatter;
-
-        push();
-
-        translate(px + p.w / 2, py + p.h / 2);
-        rotate(rotation);
-
-        image(
-          currentImage,
-          -p.w / 2,
-          -p.h / 2,
-          p.w,
-          p.h,
-          p.sx,
-          p.sy,
-          p.sw,
-          p.sh
-        );
-
-        pop();
-      }
-    }
-
-    function windowResized() {
-      resizeCanvas(windowWidth, windowHeight);
-      buildPieces();
-    }
-  </script>
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  buildComposition();
+}
+</script>
 </body>
 </html>
