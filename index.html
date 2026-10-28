@@ -7,12 +7,11 @@
 <title>REASSEMBLY</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
 <style>
-* { margin: 0; padding: 0; }
 html, body {
-  width: 100%;
-  height: 100%;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
-  background: #080808;
+  background: black;
 }
 canvas { display: block; }
 </style>
@@ -20,11 +19,7 @@ canvas { display: block; }
 <body>
 <script>
 let dj, miles;
-let pgA, pgB;
 let t = 0;
-let flow = 0;
-
-const SCALE = 0.45;
 
 function preload() {
   dj = loadImage("dj.png");
@@ -34,91 +29,35 @@ function preload() {
 function setup() {
   createCanvas(windowWidth, windowHeight);
   pixelDensity(1);
-  frameRate(30);
-  makeBuffers();
-}
-
-function makeBuffers() {
-  if (pgA) pgA.remove();
-  if (pgB) pgB.remove();
-
-  let w = max(1, floor(width * SCALE));
-  let h = max(1, floor(height * SCALE));
-
-  pgA = createGraphics(w, h);
-  pgB = createGraphics(w, h);
-  pgA.pixelDensity(1);
-  pgB.pixelDensity(1);
-
-  fitImage(pgA, dj);
-  fitImage(pgB, miles);
-}
-
-function fitImage(pg, img) {
-  pg.background(8);
-
-  let s = min(pg.width / img.width, pg.height / img.height);
-  let w = img.width * s;
-  let h = img.height * s;
-
-  pg.image(img, (pg.width - w) / 2, (pg.height - h) / 2, w, h);
+  imageMode(CENTER);
 }
 
 function draw() {
-  t += 0.002;
-  flow += 0.0015;
+  background(0);
+  t += 0.008;
 
-  background(8);
+  // Smooth, continuous changes
+  let mix = (sin(t) + 1) / 2;
+  let x = sin(t * 0.4) * width * 0.025;
+  let y = cos(t * 0.3) * height * 0.025;
+  let zoom = 1 + sin(t * 0.25) * 0.08;
 
-  // Slow, continuous blending.
-  let mix = 0.5 + 0.5 * sin(t * 0.35);
+  let s1 = min(width / dj.width, height / dj.height);
+  let s2 = min(width / miles.width, height / miles.height);
 
-  // A few large, soft-moving image layers.
-  // No per-pixel or per-tile drawing loops.
-  let dx = (noise(flow, 10) - 0.5) * width * 0.035;
-  let dy = (noise(20, flow) - 0.5) * height * 0.035;
-  let angle = (noise(flow * 0.5, 30) - 0.5) * 0.035;
+  tint(255, 255);
+  image(dj, width / 2 + x, height / 2 + y,
+        dj.width * s1 * zoom, dj.height * s1 * zoom);
 
-  push();
-  translate(width / 2 + dx, height / 2 + dy);
-  rotate(angle);
-
-  imageMode(CENTER);
-
-  tint(255, 255 * (1 - mix));
-  image(pgA, 0, 0, width * 1.06, height * 1.06);
-
-  tint(255, 255 * mix);
-  image(
-    pgB,
-    -dx * 0.7,
-    dy * 0.5,
-    width * 1.06,
-    height * 1.06
-  );
-
-  pop();
-  imageMode(CORNER);
-  noTint();
-
-  // A second, very subtle flowing layer.
-  let layerMix = 0.5 + 0.5 * sin(t * 0.19 + 1.5);
-  push();
-  translate(
-    width / 2 - dx * 1.5,
-    height / 2 - dy * 1.5
-  );
-  rotate(-angle * 1.4);
-  tint(255, 22 * layerMix);
-  image(pgA, 0, 0, width * 1.1, height * 1.1);
-  pop();
+  tint(255, mix * 255);
+  image(miles, width / 2 - x, height / 2 - y,
+        miles.width * s2 * zoom, miles.height * s2 * zoom);
 
   noTint();
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  makeBuffers();
 }
 </script>
 </body>
