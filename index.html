@@ -3,133 +3,184 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>REASSEMBLY — Miles × Mona Lisa</title>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+
   <style>
-    * { margin: 0; padding: 0; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     html, body {
       width: 100%;
       height: 100%;
       overflow: hidden;
       background: #080808;
     }
+
     canvas {
       display: block;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
     }
-    #hint {
+
+    #caption {
       position: fixed;
+      bottom: 22px;
       left: 0;
-      bottom: 14px;
       width: 100%;
+      color: rgba(255,255,255,0.65);
       text-align: center;
-      color: rgba(255,255,255,.55);
-      font: 10px Arial, sans-serif;
+      font: 11px Arial, sans-serif;
       letter-spacing: 3px;
       pointer-events: none;
     }
   </style>
 </head>
+
 <body>
-  <div id="hint">TOUCH / CLICK TO REASSEMBLE</div>
+  <div id="caption">REASSEMBLY — MILES × MONA LISA</div>
+
   <script>
-    let artwork;
+    let djImage;
+    let milesImage;
+    let currentImage;
     let pieces = [];
-    let tileSize = 18;
-    let scatter = 0;
-    let targetScatter = 0;
-    let lastInteraction = 0;
+
+    const TILE_SIZE = 24;
+    const CYCLE_DURATION = 6000;
+
+    let currentIndex = -1;
+    let cycleStart = 0;
+    let scaleFactor = 1;
+    let offsetX = 0;
+    let offsetY = 0;
 
     function preload() {
-      artwork = loadImage("dj.png");
+      djImage = loadImage("dj.png");
+      milesImage = loadImage("miles.png");
     }
 
     function setup() {
       createCanvas(windowWidth, windowHeight);
       pixelDensity(1);
-      imageMode(CORNER);
+      noStroke();
+
+      cycleStart = millis();
+      setArtwork(0);
+    }
+
+    function setArtwork(index) {
+      currentIndex = index;
+      currentImage = index === 0 ? djImage : milesImage;
       buildPieces();
     }
 
     function buildPieces() {
       pieces = [];
-      if (!artwork) return;
 
-      let scaleFactor = min(
-        width / artwork.width,
-        height / artwork.height
-      ) * 0.94;
+      if (!currentImage) return;
 
-      let displayW = artwork.width * scaleFactor;
-      let displayH = artwork.height * scaleFactor;
-      let startX = (width - displayW) / 2;
-      let startY = (height - displayH) / 2;
+      scaleFactor = min(
+        width / currentImage.width,
+        height / currentImage.height
+      ) * 0.92;
 
-      artwork.loadPixels();
+      offsetX = (width - currentImage.width * scaleFactor) / 2;
+      offsetY = (height - currentImage.height * scaleFactor) / 2;
 
-      for (let y = 0; y < artwork.height; y += tileSize) {
-        for (let x = 0; x < artwork.width; x += tileSize) {
-          let w = min(tileSize, artwork.width - x);
-          let h = min(tileSize, artwork.height - y);
+      for (let y = 0; y < currentImage.height; y += TILE_SIZE) {
+        for (let x = 0; x < currentImage.width; x += TILE_SIZE) {
+          let sw = min(TILE_SIZE, currentImage.width - x);
+          let sh = min(TILE_SIZE, currentImage.height - y);
 
           pieces.push({
-            sx: x, sy: y, sw: w, sh: h,
-            ox: startX + x * scaleFactor,
-            oy: startY + y * scaleFactor,
-            ow: w * scaleFactor,
-            oh: h * scaleFactor,
-            dx: random(-width * 0.7, width * 0.7),
-            dy: random(-height * 0.7, height * 0.7),
-            rot: random(-0.35, 0.35),
-            seed: random(1000)
+            sx: x,
+            sy: y,
+            sw: sw,
+            sh: sh,
+
+            x: offsetX + x * scaleFactor,
+            y: offsetY + y * scaleFactor,
+            w: sw * scaleFactor,
+            h: sh * scaleFactor,
+
+            dx: random(-width * 0.65, width * 0.65),
+            dy: random(-height * 0.65, height * 0.65),
+            angle: random(-0.5, 0.5)
           });
         }
       }
     }
 
+    function ease(t) {
+      t = constrain(t, 0, 1);
+      return t * t * (3 - 2 * t);
+    }
+
     function draw() {
       background(8);
-      scatter = lerp(scatter, targetScatter, 0.035);
+
+      let elapsed = millis() - cycleStart;
+      let imageIndex = floor(elapsed / CYCLE_DURATION) % 2;
+
+      if (imageIndex !== currentIndex) {
+        setArtwork(imageIndex);
+      }
+
+      let timeInCycle = elapsed % CYCLE_DURATION;
+      let scatter = 0;
+
+      // 最初は元の画像を見せる
+      if (timeInCycle < 1000) {
+        scatter = 0;
+      }
+
+      // 画像が散乱する
+      else if (timeInCycle < 2600) {
+        scatter = ease((timeInCycle - 1000) / 1600);
+      }
+
+      // 断片が元の位置へ戻る
+      else if (timeInCycle < 4200) {
+        scatter = 1 - ease((timeInCycle - 2600) / 1600);
+      }
+
+      // 再構成された画像を見せる
+      else {
+        scatter = 0;
+      }
 
       for (let p of pieces) {
-        let movement = scatter;
-        let driftX = sin(frameCount * 0.012 + p.seed) * 9 * movement;
-        let driftY = cos(frameCount * 0.015 + p.seed) * 9 * movement;
-        let px = p.ox + p.dx * movement + driftX;
-        let py = p.oy + p.dy * movement + driftY;
+        let moveX = p.dx * scatter;
+        let moveY = p.dy * scatter;
+
+        let px = p.x + moveX;
+        let py = p.y + moveY;
+        let rotation = p.angle * scatter;
 
         push();
-        translate(px + p.ow / 2, py + p.oh / 2);
-        rotate(p.rot * movement);
+
+        translate(px + p.w / 2, py + p.h / 2);
+        rotate(rotation);
+
         image(
-          artwork,
-          -p.ow / 2, -p.oh / 2, p.ow, p.oh,
-          p.sx, p.sy, p.sw, p.sh
+          currentImage,
+          -p.w / 2,
+          -p.h / 2,
+          p.w,
+          p.h,
+          p.sx,
+          p.sy,
+          p.sw,
+          p.sh
         );
+
         pop();
       }
-
-      if (millis() - lastInteraction > 5000) {
-        targetScatter = 0;
-      }
-    }
-
-    function mousePressed() {
-      interact();
-      return false;
-    }
-
-    function touchStarted() {
-      interact();
-      return false;
-    }
-
-    function interact() {
-      targetScatter = targetScatter < 0.5 ? 1 : 0;
-      lastInteraction = millis();
     }
 
     function windowResized() {
