@@ -1,0 +1,141 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REASSEMBLY — Miles × Mona Lisa</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #080808;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    #hint {
+      position: fixed;
+      left: 0;
+      bottom: 14px;
+      width: 100%;
+      text-align: center;
+      color: rgba(255,255,255,.55);
+      font: 10px Arial, sans-serif;
+      letter-spacing: 3px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="hint">TOUCH / CLICK TO REASSEMBLE</div>
+  <script>
+    let artwork;
+    let pieces = [];
+    let tileSize = 18;
+    let scatter = 0;
+    let targetScatter = 0;
+    let lastInteraction = 0;
+
+    function preload() {
+      artwork = loadImage("dj.png");
+    }
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      pixelDensity(1);
+      imageMode(CORNER);
+      buildPieces();
+    }
+
+    function buildPieces() {
+      pieces = [];
+      if (!artwork) return;
+
+      let scaleFactor = min(
+        width / artwork.width,
+        height / artwork.height
+      ) * 0.94;
+
+      let displayW = artwork.width * scaleFactor;
+      let displayH = artwork.height * scaleFactor;
+      let startX = (width - displayW) / 2;
+      let startY = (height - displayH) / 2;
+
+      artwork.loadPixels();
+
+      for (let y = 0; y < artwork.height; y += tileSize) {
+        for (let x = 0; x < artwork.width; x += tileSize) {
+          let w = min(tileSize, artwork.width - x);
+          let h = min(tileSize, artwork.height - y);
+
+          pieces.push({
+            sx: x, sy: y, sw: w, sh: h,
+            ox: startX + x * scaleFactor,
+            oy: startY + y * scaleFactor,
+            ow: w * scaleFactor,
+            oh: h * scaleFactor,
+            dx: random(-width * 0.7, width * 0.7),
+            dy: random(-height * 0.7, height * 0.7),
+            rot: random(-0.35, 0.35),
+            seed: random(1000)
+          });
+        }
+      }
+    }
+
+    function draw() {
+      background(8);
+      scatter = lerp(scatter, targetScatter, 0.035);
+
+      for (let p of pieces) {
+        let movement = scatter;
+        let driftX = sin(frameCount * 0.012 + p.seed) * 9 * movement;
+        let driftY = cos(frameCount * 0.015 + p.seed) * 9 * movement;
+        let px = p.ox + p.dx * movement + driftX;
+        let py = p.oy + p.dy * movement + driftY;
+
+        push();
+        translate(px + p.ow / 2, py + p.oh / 2);
+        rotate(p.rot * movement);
+        image(
+          artwork,
+          -p.ow / 2, -p.oh / 2, p.ow, p.oh,
+          p.sx, p.sy, p.sw, p.sh
+        );
+        pop();
+      }
+
+      if (millis() - lastInteraction > 5000) {
+        targetScatter = 0;
+      }
+    }
+
+    function mousePressed() {
+      interact();
+      return false;
+    }
+
+    function touchStarted() {
+      interact();
+      return false;
+    }
+
+    function interact() {
+      targetScatter = targetScatter < 0.5 ? 1 : 0;
+      lastInteraction = millis();
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      buildPieces();
+    }
+  </script>
+</body>
+</html>
