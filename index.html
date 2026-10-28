@@ -1,10 +1,14 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>PORTRAIT — Generative Art</title>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+
   <style>
     html, body {
       margin: 0;
@@ -12,24 +16,29 @@
       background: #000;
       overflow: hidden;
     }
+
     canvas {
       display: block;
     }
   </style>
 </head>
+
 <body>
 <script>
 let miles;
 let dj;
+let fuck;
 
 function preload() {
   miles = loadImage("miles.png");
   dj = loadImage("dj.png");
+  fuck = loadImage("fuck.png");
 }
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
   imageMode(CENTER);
+
   miles.filter(GRAY);
   dj.filter(GRAY);
 }
@@ -38,32 +47,30 @@ function draw() {
   background(0);
 
   let t = frameCount * 0.003;
-
-  // ゆっくり変化する重なり
   let mix = (sin(t) + 1) / 2;
 
-  // 写真が呼吸するように拡大・縮小
+  // ゆっくりした拡大・縮小
   let zoom = 1.08 + sin(t * 0.7) * 0.06;
 
-  // 画面中央から少しずらす
+  // わずかな位置の変化
   let shiftX = sin(t * 0.6) * width * 0.08;
   let shiftY = cos(t * 0.5) * height * 0.04;
 
-  // 背後に残る薄い肖像
+  // 背後の肖像
   drawPortrait(
     dj,
     width * 0.48 - shiftX,
-    height * 0.50 + shiftY,
+    height * 0.5 + shiftY,
     zoom * 1.12,
     35 + mix * 25,
     -0.025
   );
 
-  // 2枚の肖像がゆっくり入れ替わる
+  // 2枚の肖像が重なり合う
   drawPortrait(
     miles,
     width * 0.52 + shiftX,
-    height * 0.50 - shiftY,
+    height * 0.5 - shiftY,
     zoom,
     70 + mix * 100,
     sin(t * 0.4) * 0.025
@@ -72,16 +79,32 @@ function draw() {
   drawPortrait(
     dj,
     width * 0.48 - shiftX,
-    height * 0.50 + shiftY,
+    height * 0.5 + shiftY,
     zoom,
     170 - mix * 100,
     cos(t * 0.4) * 0.025
   );
 
-  // 周囲を暗くして視線を中央へ
+  // fuck.png をゆっくり出現・消失させる
+  let a = (sin(frameCount * 0.008) + 1) / 2;
+
+  push();
+  tint(255, a * 180);
+  image(
+    fuck,
+    width / 2,
+    height / 2,
+    width * 0.85,
+    height * 0.85
+  );
+  pop();
+
+  // 周囲を暗くする
   noStroke();
+
   for (let i = 0; i < 12; i++) {
     fill(0, 0, 0, 9);
+
     rect(
       i * width / 24,
       i * height / 24,
@@ -92,7 +115,11 @@ function draw() {
 }
 
 function drawPortrait(img, x, y, zoom, alpha, angle) {
-  let scaleSize = min(width / img.width, height / img.height);
+  let scaleSize = min(
+    width / img.width,
+    height / img.height
+  );
+
   let w = img.width * scaleSize * zoom;
   let h = img.height * scaleSize * zoom;
 
