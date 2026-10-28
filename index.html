@@ -119,21 +119,32 @@ function draw() {
 
   // 肖像の分解・再構成
   for (let p of pieces) {
-    push();
+// FUCK — QUIET TYPOGRAPHY
+if (fuckImage && fuckImage.width > 0) {
+  let t = frameCount * 0.008;
 
-    translate(
-      p.x + p.w / 2 + p.dx * scatter,
-      p.y + p.h / 2 + p.dy * scatter
-    );
+  // 控えめなサイズ
+  let w = width * 0.42;
+  let h = w * fuckImage.height / fuckImage.width;
 
-    rotate(p.angle * scatter);
-    scale(1 + scatter * 1.5);
+  // ゆっくり出現・消失
+  let alpha = map(sin(t), -1, 1, 35, 150);
 
-    if (flash || p.red && scatter > 0.3) {
-      tint(240, 15, 30, 220);
-    } else {
-      tint(255, 255);
-    }
+  push();
+  translate(
+    width * 0.5 + sin(t * 0.7) * width * 0.08,
+    height * 0.5 + cos(t * 0.6) * height * 0.06
+  );
+  rotate(sin(t * 0.5) * 0.08);
+
+  tint(255, 0, 25, alpha);
+  imageMode(CENTER);
+  image(fuckImage, 0, 0, w, h);
+
+  pop();
+  tint(255);
+  imageMode(CORNER);
+}
 
     image(
       currentImage,
